@@ -26,6 +26,13 @@ from hashlib import sha256
 from optparse import OptionGroup, OptionParser
 from concurrent.futures._base import TimeoutError
 from asyncio import coroutine, coroutines, futures
+import logging
+
+import miner
+import miner.cpu
+import miner.gpu
+import morpavsolver
+import pysa
 
 try:
     import PySide
@@ -33,8 +40,9 @@ try:
 except ImportError:
     gui_enabled = False
 
-from morpavsolver import Solver
+
 from version import VERSION
+
 
 class Server(object):
     @classmethod
@@ -61,6 +69,7 @@ class ServerSwitcher(object):
 
     @coroutine
     def run(self):
+        self.solvers.start(self.loop)
         for server in itertools.cycle(self.servers):
             try:
                 client = StratumClient(self.loop, server, self.solvers)
@@ -151,6 +160,9 @@ class Job(object):
         return header
 
     @classmethod
+    # TODO: rewrite to use constants, logger and turn in into an
+    # instance method since the target is an attribute add class
+    # method get_len_and_solution()
     def is_valid(cls, header, solution, target):
         assert (len(header) == 140)
         assert (len(solution) == 1344 + 3)
@@ -163,61 +175,6 @@ class Job(object):
     def __repr__(self):
         return str(self.__dict__)
 
-class CpuSolver(threading.Thread):
-    def __init__(self, loop, counter):
-        super(CpuSolver, self).__init__()
-        self._stop = False
-        self.loop = loop
-        self.counter = counter
-
-        self.job = None
-        self.nonce1 = None
-        self.nonce2_int = 0
-        self.on_share = None
-
-    def stop(self):
-        raise Exception("FIXME")
-        self._stop = True
-
-    def set_nonce(self, nonce1):
-        self.nonce1 = nonce1
-
-    def new_job(self, job, solver_nonce, on_share):
-        self.job = job
-        self.solver_nonce = solver_nonce
-        self.on_share = on_share
-
-    def increase_nonce(self):
-        if self.nonce2_int > 2**62:
-            self.nonce2_int = 0
-
-        self.nonce2_int += 1
-        return struct.pack('>q', self.nonce2_int)
-
-    def run(self):
-        print("Starting CPU solver")
-        s = Solver()
-
-        while self.job == None or self.nonce1 == None:
-            time.sleep(2)
-            print(".", end='', flush=True)
-
-        while not self._stop:
-            nonce2 = self.increase_nonce()
-            nonce2 = nonce2.rjust(32 - len(self.nonce1) - len(self.solver_nonce), b'\0')
-
-            header = self.job.build_header(self.nonce1 + self.solver_nonce + nonce2)
-
-            sol_cnt = s.find_solutions(header)
-            self.counter(sol_cnt) # Increase counter for stats
-
-            for i in range(sol_cnt):
-                solution = b'\xfd\x40\x05' + s.get_solution(i)
-
-                if self.job.is_valid(header, solution, self.job.target):
-                    print("FOUND VALID SOLUTION!")
-                    # asyncio.run_coroutine_threadsafe(self.on_share(self.job, self.solver_nonce + nonce2, solution), self.loop)
-                    asyncio.async(self.on_share(self.job, self.solver_nonce + nonce2, solution), loop=self.loop)
 
 class SolverPool(object):
     def __init__(self, loop, gpus=0, cpus=0):
@@ -226,17 +183,24 @@ class SolverPool(object):
         self.solutions = 0
 
         for i in range(cpus):
-            s = CpuSolver(loop, self.inc_solutions)
-            s.start()
-            self.solvers.append(s)
+            m = miner.cpu.CpuMiner(loop, self.inc_solutions, i, morpavsolver.Solver)
+            self.solvers.append(m)
+
+        for i in range(gpus):
+            m = miner.gpu.GpuMiner(loop, self.inc_solutions, i, pysa.Solver)
+            self.solvers.append(m)
+
+    def start(self, loop):
+        for s in self.solvers:
+            asyncio.async(s.run(), loop=loop)
 
     def inc_solutions(self, i):
         self.solutions += i
-        print("%.02f H/s" % (self.solutions / (time.time() - self.time_start)))
+        print("%.02f H/s" % (self.solutions / (time.time() - self.time_start)), flush=True)
 
     def set_nonce(self, nonce1):
         for i, s in enumerate(self.solvers):
-            s.set_nonce(nonce1)
+            s.set_nonce1(nonce1)
 
     def new_job(self, job, on_share):
         for i, s in enumerate(self.solvers):
@@ -263,7 +227,7 @@ class StratumClient(object):
     @coroutine
     def connect(self):
         print("Connecting to", self.server)
-        asyncio.open_connection()
+        #asyncio.open_connection()
         reader, self.writer = yield from asyncio.open_connection(self.server.host, self.server.port, loop=self.loop)
 
         # Observe and route incoming message
@@ -323,7 +287,6 @@ class StratumClient(object):
     @coroutine
     def submit(self, job, nonce2, solution):
         t = time.time()
-
         ret = yield from self.call('mining.submit',
                         self.server.username,
                         job.job_id,
@@ -412,6 +375,8 @@ def main():
     (options, options.servers) = parser.parse_args()
     options.version = VERSION
 
+    logging.basicConfig(level=logging.INFO)
+
     servers = [ Server.from_url(s) for s in options.servers]
     if len(servers) == 0:
         parser.print_usage()
@@ -427,18 +392,25 @@ def main():
     else:
         cpus = options.cpu
 
+    # if options.gpu == -1:
+    #     gpus = 0
+    # elif options.gpu == 0:
+    #     gpus = 1
+    # else:
+    #     gpus = options.gpu
+    gpus = 2
     global gui_enabled
     if options.nogui:
         gui_enabled = False
     elif not gui_enabled:
         print("GUI disabled, please install PySide/Qt first.")
 
-    print("Using %d CPU solver instances" % cpus)
+    print('Using {0} CPU miner, {1} GPU miner instances'.format(cpus, gpus))
     print(servers)
 
     loop = asyncio.get_event_loop()
 
-    solvers = SolverPool(loop, gpus=0, cpus=cpus)
+    solvers = SolverPool(loop, gpus=gpus, cpus=cpus)
     switcher = ServerSwitcher(loop, servers, solvers)
     loop.run_until_complete(switcher.run())
 

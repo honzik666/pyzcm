@@ -11,15 +11,14 @@ MIT license
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-import miner.params
-from miner import AsyncMiner
+from pyzcm.miner import AsyncMiner
 
 class CpuMiner(AsyncMiner):
     """A CPU miner class - runs in a separate thread. """
     def __init__(self, loop, counter, cpu_id, solver_class):
+        super(CpuMiner, self).__init__(loop, counter)
         self.cpu_id = cpu_id
         self.solver = solver_class(verbose=self.is_logger_verbose())
-        super(CpuMiner, self).__init__(loop, counter)
 
     def __format__(self, format_spec):
         return 'CPU[{}]'.format(self.cpu_id)

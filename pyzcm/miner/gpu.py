@@ -18,10 +18,9 @@ import binascii
 import logging
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import traceback
+import time
 
-import miner.params
-from miner import GenericMiner, AsyncMiner
-import pysa
+from pyzcm.miner import GenericMiner, AsyncMiner
 
 class _GpuMinerProcess(GenericMiner):
     """This class represents a backend GPU miner that is run in a
@@ -41,7 +40,8 @@ class _GpuMinerProcess(GenericMiner):
         super(_GpuMinerProcess, self).__init__()
 
     def __format__(self, format_spec):
-        return 'GPU[{0}](pid={1})'.format(self.gpu_id, os.getpid())
+        return 'GPU[{0}:{1}](pid={2})'.format(self.gpu_id[0], self.gpu_id[1],
+                                              os.getpid())
 
     def count_solutions(self, count):
         """Provide counter method required by the parent class
@@ -58,7 +58,11 @@ class _GpuMinerProcess(GenericMiner):
         self.solution_count = 0
 
     def run(self, result_queue, work_queue):
-        solver = self.solver_class(verbose=self.is_logger_verbose())
+        self.log.debug('Instantiating GPU solver process {0}, verbose={1}'.format(
+            self.solver_class, self.is_logger_verbose()))
+        solver = self.solver_class(self.gpu_id, verbose=self.is_logger_verbose())
+        self.log.debug('Instantiated GPU solver {0}, verbose={1}'.format(
+            self.solver_class, self.is_logger_verbose()))
         self.result_queue = result_queue
         while True:
             # Fetch a new job if available
@@ -82,6 +86,7 @@ class _GpuMinerProcess(GenericMiner):
 def run_miner_process(gpu_id, solver_class, result_queue, work_queue):
     try:
         miner_process = _GpuMinerProcess(gpu_id, solver_class)
+        logging.debug('Instantiated MinerProcess')
         miner_process.run(result_queue, work_queue)
     except Exception as e:
         logging.error('FATAL:{0}{1}'.format(e, traceback.format_exc()))
@@ -93,6 +98,10 @@ class GpuMiner(AsyncMiner):
     The miner communicates with the backend process via queues.
     """
     def __init__(self, loop, counter, gpu_id, solver_class):
+        """
+        @param counter - callback that accounts for found solution
+        @param gpu_id - a tuple, that contains: platform_id and device_id
+        """
         self.solver_class = solver_class
         mgr = multiprocessing.Manager()
         self.work_queue = mgr.Queue()
@@ -107,7 +116,7 @@ class GpuMiner(AsyncMiner):
         self.work_queue.put((self.job, self.nonce1, self.solver_nonce))
 
     def __format__(self, format_spec):
-        return 'Async-frontend-GPU[{}]'.format(self.gpu_id)
+        return 'Async-frontend-GPU[{0}:{1}]'.format(self.gpu_id[0], self.gpu_id[1])
 
     @asyncio.coroutine
     def run(self):

@@ -53,7 +53,7 @@ def load_library(path=None):
 
 
 class Solver:
-    def __init__(self):
+    def __init__(self, verbose=False):
         self.solver_ = self.header_ = self.solutions_ = self.solution_to_check_ = None
         self._ensure_library()
         assert library and ffi

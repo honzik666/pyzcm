@@ -8,12 +8,13 @@ This module provides classes to implement actual miners
 MIT license
 """
 
-import miner.params
 import logging
 import abc
 import binascii
 import time
 import asyncio
+
+from pyzcm.miner.params import *
 
 
 class GenericMiner(object):
@@ -26,7 +27,14 @@ class GenericMiner(object):
         # Keep nonce2 as integer unlike the remaining parts of the
         # nonce so that it can be easily incremented
         self.nonce2_int = 0
-        self.log = logging.getLogger('{0}.{1}'.format(__name__, self))
+        self._log = None
+
+    @property
+    def log(self):
+        """Lazy setup of the logger"""
+        if self._log is None:
+            self._log = logging.getLogger('{0}.{1}'.format(__name__, self))
+        return self._log
 
     def is_logger_verbose(self):
         return self.log.isEnabledFor(logging.DEBUG)
@@ -56,7 +64,7 @@ class GenericMiner(object):
             self.nonce2_int[0] = 0
         self.nonce2_int += 1
 
-        nonce2_len = miner.params.ZC_NONCE_LENGTH - len(self.nonce1) - \
+        nonce2_len = ZC_NONCE_LENGTH - len(self.nonce1) - \
                      len(self.solver_nonce)
         nonce2_bytes = self.nonce2_int.to_bytes(nonce2_len, byteorder='little')
 
@@ -135,5 +143,5 @@ class AsyncMiner(GenericMiner):
         self.counter(solution_count)
 
     def stop(self):
-        raise Exception("FIXME")
+        raise Exception('FIXME')
         self._stop = True

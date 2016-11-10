@@ -70,7 +70,7 @@ class _GpuMinerProcess(GenericMiner):
                 # non-blocking read from the queue
                 (self.job, self.nonce1, self.solver_nonce) = work_queue.get(False)
                 self.log.info('received mining job_id:{0}, nonce1:{1}, solver_nonce:{2}'.
-                              format(self.job.job_id, self.nonce1,
+                              format(self.job.job_id, binascii.hexlify(self.nonce1),
                                      binascii.hexlify(self.solver_nonce)))
             except queue.Empty:
                 self.log.debug('No new job, waiting')

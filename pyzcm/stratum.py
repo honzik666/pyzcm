@@ -58,10 +58,14 @@ class Job(object):
         assert(len(solution) == ZC_SOLUTION_LENGTH + 3)
 
         hash = sha256(sha256(header + solution).digest()).digest()
-        cls.log.debug('hash {:#064x}'.format(int.from_bytes(hash, 'little')))
+        hash_int = int.from_bytes(hash, 'little')
+        result = hash_int < target
 
-        return int.from_bytes(hash, 'little') < target
+        # hash values are formatted as 2(0x) + 64 characters = 66 with leading 0's
+        cls.log.debug('hash {0:#066x} < {1:#066x} = result:{2}'.format(
+            hash_int, target, result))
 
+        return result
     def __repr__(self):
         return str(self.__dict__)
 

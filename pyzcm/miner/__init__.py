@@ -100,6 +100,8 @@ class GenericMiner(object):
         sol_cnt = solver.find_solutions(header)
         t2 = time.time()
         self.count_solutions(sol_cnt)
+        self.log.debug('Validating {0} solutions against target:{1:#066x}'.format(
+            sol_cnt, self.job.target))
         for i in range(sol_cnt):
             # len_and_solution = job.get_len_and_solution(solver.get_solution(i)
             len_and_solution = b'\xfd\x40\x05' + solver.get_solution(i)

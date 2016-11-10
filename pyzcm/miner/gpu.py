@@ -112,8 +112,11 @@ class GpuMiner(AsyncMiner):
 
     def new_job(self, job, solver_nonce, on_share):
         super(GpuMiner, self).new_job(job, solver_nonce, on_share)
-        self.log.info('Queueing new job: 0x{}'.format(self.job.job_id))
-        self.work_queue.put((self.job, self.nonce1, self.solver_nonce))
+        # Enqueue only a when the job is ready along with nonce1
+        # (sometimes the job is ready sooner than nonce 1)
+        if self.job is not None and self.nonce1 is not None:
+            self.log.info('Queueing new job: 0x{}'.format(self.job.job_id))
+            self.work_queue.put((self.job, self.nonce1, self.solver_nonce))
 
     def __format__(self, format_spec):
         return 'Async-frontend-GPU[{0}:{1}]'.format(self.gpu_id[0], self.gpu_id[1])

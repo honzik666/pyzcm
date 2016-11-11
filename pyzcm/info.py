@@ -43,7 +43,7 @@ class CpuMinerInfo(_MinerInfo):
         else:
             self.cpu_count = min(cpus, multiprocessing.cpu_count())
 
-        self.log.info("CPU's {0}/{0}/{0}, requested/present/used-for".format(
+        self.log.info("CPU's {0}/{1}/{2}, requested/present/used-for".format(
                 cpus, multiprocessing.cpu_count(), self.cpu_count))
 
     def get_device_ids(self):

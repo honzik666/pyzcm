@@ -83,7 +83,10 @@ def get_cpu_miner_info(args):
     cpu_miner_info = None
     try:
         import morpavsolver
-        cpu_miner_info = CpuMinerInfo(args.cpus, morpavsolver.Solver)
+        if args.cpus > -1:
+            cpu_miner_info = CpuMinerInfo(args.cpus, morpavsolver.Solver)
+        else:
+            log.info('CPU mining disabled')
     except ImportError:
         log.warn('CPU solver module is not installed')
 

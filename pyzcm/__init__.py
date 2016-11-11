@@ -83,10 +83,12 @@ class MinerManager(object):
                 self.miners.append(m)
 
     def start(self, loop):
-        self.log.debug('Starting GPU detection')
-        yield from self.gpu_info.detect_devices(loop)
+        if (self.gpu_info is not None):
+            self.log.debug('Starting GPU detection')
+            yield from self.gpu_info.detect_devices(loop)
+            self.load_miners_from_info(loop, self.gpu_info, GpuMiner)
+
         self.load_miners_from_info(loop, self.cpu_info, CpuMiner)
-        self.load_miners_from_info(loop, self.gpu_info, GpuMiner)
         for m in self.miners:
             asyncio.async(m.run(), loop=loop)
 

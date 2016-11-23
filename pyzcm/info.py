@@ -97,7 +97,10 @@ class GpuMinerInfo(_MinerInfo):
         self.detected_gpu_platforms = yield from \
                            loop.run_in_executor(proc_executor,
                                                 self.detect_devices_process)
-        self.log.debug("Detected GPU's: {}".format(self.detected_gpu_platforms))
+        self.log.info("Detected GPU's: {}".format(self.detected_gpu_platforms))
+        if self.requested_gpus is None:
+            self.log.info("Add all GPU's to request list")
+            self.requested_gpus = [(p_id, []) for p_id, p in enumerate(self.detected_gpu_platforms)]
 
     @classmethod
     def detect_devices_process(cls):

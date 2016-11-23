@@ -22,6 +22,10 @@ def gpu_spec_type(str):
     - 0: -> platform 0, all devices
     - 1:1,3,5 -> platform 1, selected devices only
     """
+    # -1 indicates GPU mining is disabled
+    if str == '-1':
+        return str
+
     try:
         (platform_id_str, devs_str) = str.split(':')
     except ValueError as e:
@@ -59,9 +63,9 @@ def parse_args():
                         help="How many CPU' solvers to start {}".format(
                             solvers_help_str),
                         type=int)
-    # TODO: turn this into an argument group
     parser.add_argument('-g', '--gpus', dest='gpus', default=None, action='append',
-                        help="How many GPU's to in the form [platform]:idx,idx,idx".format(
+                        help="How many GPU's to use in the form [platform]:idx,idx,idx. When set to '-1' " \
+                        "- GPU mining is disabled".format(
                             solvers_help_str),
                         type=gpu_spec_type)
     parser.add_argument('-e', '--equihash-instances-per-gpu-device',
@@ -96,8 +100,11 @@ def get_cpu_miner_info(args):
 def get_gpu_miner_info(args):
     gpu_miner_info = None
     try:
-        import pysa.solver
-        gpu_miner_info = GpuMinerInfo(args.gpus, args.eh_per_gpu, pysa.solver.Solver)
+        if args.gpus != ['-1']:
+            import pysa.solver
+            gpu_miner_info = GpuMinerInfo(args.gpus, args.eh_per_gpu, pysa.solver.Solver)
+        else:
+            log.info('GPU mining disabled')
     except ImportError:
         log.warn('GPU solver module is not installed')
     return gpu_miner_info

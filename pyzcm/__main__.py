@@ -96,8 +96,8 @@ def get_cpu_miner_info(args):
 def get_gpu_miner_info(args):
     gpu_miner_info = None
     try:
-        import pysa
-        gpu_miner_info = GpuMinerInfo(args.gpus, args.eh_per_gpu, pysa.Solver)
+        import pysa.solver
+        gpu_miner_info = GpuMinerInfo(args.gpus, args.eh_per_gpu, pysa.solver.Solver)
     except ImportError:
         log.warn('GPU solver module is not installed')
     return gpu_miner_info

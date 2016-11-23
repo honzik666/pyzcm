@@ -82,9 +82,9 @@ def parse_args():
 def get_cpu_miner_info(args):
     cpu_miner_info = None
     try:
-        import morpavsolver
+        import pyzceqsolver.solver
         if args.cpus > -1:
-            cpu_miner_info = CpuMinerInfo(args.cpus, morpavsolver.Solver)
+            cpu_miner_info = CpuMinerInfo(args.cpus, pyzceqsolver.solver.Solver)
         else:
             log.info('CPU mining disabled')
     except ImportError:

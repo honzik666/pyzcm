@@ -25,8 +25,15 @@ virtualenv --python=/usr/bin/python3 .zcashvenv3
 pip install numpy
 ```
 
-### Development mode installation
+##  Installing in development mode
+
 ```
 cd pyzcm
 pip install -e .
+```
+
+##  Building binary distribution package
+```
+pip install wheel
+python ./setup.py bdist_wheel
 ```

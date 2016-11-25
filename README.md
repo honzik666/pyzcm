@@ -37,3 +37,20 @@ pip install -e .
 pip install wheel
 python ./setup.py bdist_wheel
 ```
+
+
+## Building executable - PyInstaller
+
+The result is a self-contained executable that has everything bundled. The upx-ucl below is optional - it enables compression of the resulting executable.
+
+- Install prerequisities:
+```
+pip install pyinstaller
+sudo apt-get install upx-ucl
+```
+
+- Build the executable:
+
+```
+pyinstaller  --log-level=DEBUG ./pyzcm.spec
+```

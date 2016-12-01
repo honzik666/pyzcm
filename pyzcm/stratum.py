@@ -19,26 +19,28 @@ from pyzcm.miner.params import *
 class Job(object):
     log = logging.getLogger('{0}.{1}'.format(__name__, 'Job'))
         
-    @classmethod
-    def from_params(cls, params):
-        j = cls()
-        j.job_id = params[0]
-        j.version = binascii.unhexlify(params[1])
-        j.prev_hash = binascii.unhexlify(params[2])
-        j.merkle_root = binascii.unhexlify(params[3])
-        j.reserved = binascii.unhexlify(params[4])
-        j.ntime = binascii.unhexlify(params[5])
-        j.nbits = binascii.unhexlify(params[6])
-        j.clean_job = bool(params[7])
+    def __init__(self, params):
+        """Job initializer
 
-        assert(len(j.version) == 4)
-        assert(len(j.prev_hash) == 32)
-        assert(len(j.merkle_root) == 32)
-        assert(len(j.reserved) == 32)
-        assert(len(j.ntime) == 4)
-        assert(len(j.nbits) == 4)
+        @param params - list of job parameters in exact order provided
+        by stratum protocol
+        """
+        self.job_id = params[0]
+        self.version = binascii.unhexlify(params[1])
+        self.prev_hash = binascii.unhexlify(params[2])
+        self.merkle_root = binascii.unhexlify(params[3])
+        self.reserved = binascii.unhexlify(params[4])
+        self.ntime = binascii.unhexlify(params[5])
+        self.nbits = binascii.unhexlify(params[6])
+        self.clean_job = bool(params[7])
+        self.target = None
 
-        return j
+        assert(len(self.version) == 4)
+        assert(len(self.prev_hash) == 32)
+        assert(len(self.merkle_root) == 32)
+        assert(len(self.reserved) == 32)
+        assert(len(self.ntime) == 4)
+        assert(len(self.nbits) == 4)
 
     def set_target(self, target):
         self.target = target
@@ -114,7 +116,7 @@ class StratumClient(object):
     def on_notify(self, msg):
         if msg['method'] == 'mining.notify':
             self.log.debug('Giving new job to miners')
-            j = Job.from_params(msg['params'])
+            j = Job(msg['params'])
             j.set_target(self.target)
             self.miners.new_job(j, self.submit)
             return

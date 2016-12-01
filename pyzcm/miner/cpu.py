@@ -15,8 +15,8 @@ from pyzcm.miner import AsyncMiner
 
 class CpuMiner(AsyncMiner):
     """A CPU miner class - runs in a separate thread. """
-    def __init__(self, loop, counter, cpu_id, solver_class):
-        super(CpuMiner, self).__init__(loop, counter)
+    def __init__(self, solver_nonce, loop, counter, cpu_id, solver_class):
+        super(CpuMiner, self).__init__(solver_nonce, loop, counter)
         self.cpu_id = cpu_id
         self.solver = solver_class(verbose=self.is_logger_verbose())
 
@@ -25,20 +25,20 @@ class CpuMiner(AsyncMiner):
 
     def run_cpu_solver(self):
         while not self._stop:
-            self.do_pow(self.solver)
+            self.do_pow(self.solver, self.last_received_job)
 
-    def submit_solution(self, nonce2, len_and_solution):
+    def submit_solution(self, job, nonce2, len_and_solution):
         """Override the default submission mechanism since the solution is
         being submitted from a separate thread.
 
         """
         self.loop.call_soon_threadsafe(super(CpuMiner, self).submit_solution,
-                                       nonce2, len_and_solution)
+                                       job, nonce2, len_and_solution)
 
     @asyncio.coroutine
     def run(self):
         self.log.info('Waiting for first mining job')
-        while self.job == None or self.nonce1 == None:
+        while self.last_received_job == None or self.nonce1 == None:
             yield from asyncio.sleep(2)
             self.log.debug('.')
         self.log.info('First job received')

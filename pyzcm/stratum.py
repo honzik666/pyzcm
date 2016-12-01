@@ -118,7 +118,7 @@ class StratumClient(object):
             self.log.debug('Giving new job to miners')
             j = Job(msg['params'])
             j.set_target(self.target)
-            self.miners.new_job(j, self.submit)
+            self.miners.register_new_job(j, self.submit)
             return
 
         if msg['method'] == 'mining.set_target':
@@ -145,15 +145,29 @@ class StratumClient(object):
         self.miners.set_nonce(nonce1)
         return nonce1
 
+    def submit(self, job, nonce2, len_and_solution):
+        """Triggers asynchronous submission of the share to the stratum server
+
+        """
+        asyncio.async(self._do_submit(job, nonce2, len_and_solution),
+                      loop=self.loop)
+
     @asyncio.coroutine
-    def submit(self, job, nonce2, solution):
+    def _do_submit(self, job, nonce2, len_and_solution):
+        """Submit a solution (share) to the stratum server.
+
+        @param job - job that the miner has worked on and found solution
+        @param nonce2 - nonce that the miner has found
+        @param len_and_solution - solution with variable int length
+        prefix as required by the zcash protocol
+        """
         t = time.time()
         ret = yield from self.call('mining.submit',
                         self.server.username,
                         job.job_id,
                         binascii.hexlify(job.ntime).decode('utf-8'),
                         binascii.hexlify(nonce2).decode('utf-8'),
-                        binascii.hexlify(solution).decode('utf-8'))
+                        binascii.hexlify(len_and_solution).decode('utf-8'))
         delta_time_str = '{:.02f} s'.format(time.time() - t)
         if ret['result'] == True:
             self.log.info('Share ACCEPTED in ' + delta_time_str)

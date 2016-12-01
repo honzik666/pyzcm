@@ -77,10 +77,12 @@ class MinerManager(object):
     def load_miners_from_info(self, loop, info, miner_class):
         if info is not None:
             for id in info.get_device_ids():
-                m = miner_class(loop, self.inc_solutions, id, 
+                solver_nonce = len(self.miners).to_bytes(1, 'little')
+                m = miner_class(solver_nonce, loop, self.inc_solutions, id, 
                                 info.get_solver_class())
                 self.log.debug('Loaded miner: {}'.format(m))
                 self.miners.append(m)
+            assert(len(self.miners) <= 255)
 
     def start(self, loop):
         if (self.gpu_info is not None):
@@ -102,10 +104,12 @@ class MinerManager(object):
         for i, m in enumerate(self.miners):
             m.set_nonce1(nonce1)
 
-    def new_job(self, job, on_share):
-        assert(len(self.miners) <= 255)
-        for i, m in enumerate(self.miners):
-            m.new_job(job, i.to_bytes(1, 'little'), on_share)
+    def register_new_job(self, job, on_share):
+        """
+        on_share: arbitrary method that accepts found nonce and solution
+        """
+        for m in self.miners:
+            m.register_new_job(job, on_share)
 
     def stop(self):
         for m in self.miners:

@@ -91,8 +91,8 @@ class StratumClient(object):
         self.notifier = StratumNotifier(reader, self.on_notify)
         self.notifier.run()
 
-        yield from self.subscribe()
         yield from self.authorize()
+        yield from self.subscribe()
 
         while True:
             yield from asyncio.sleep(1)

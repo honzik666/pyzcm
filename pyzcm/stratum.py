@@ -50,20 +50,18 @@ class Job(object):
         assert(len(header) == ZC_BLOCK_HEADER_LENGTH)
         return header
 
-    @classmethod
-    # TODO: rewrite, turn it into an instance method since the target
-    # is an attribute add class method get_len_and_solution()
-    def is_valid(cls, header, solution, target):
+    def is_valid(self, header, len_and_solution):
         assert(len(header) == ZC_BLOCK_HEADER_LENGTH)
-        assert(len(solution) == ZC_SOLUTION_LENGTH + 3)
+        assert(len(len_and_solution) == ZC_SOLUTION_LENGTH + 3)
+        assert(self.target is not None)
 
-        hash = sha256(sha256(header + solution).digest()).digest()
+        hash = sha256(sha256(header + len_and_solution).digest()).digest()
         hash_int = int.from_bytes(hash, 'little')
-        result = hash_int < target
+        result = hash_int < self.target
 
         # hash values are formatted as 2(0x) + 64 characters = 66 with leading 0's
-        cls.log.debug('hash {0:#066x} < {1:#066x} = result:{2}'.format(
-            hash_int, target, result))
+        self.log.debug('Job ID:{0} hash {1:#066x} < {2:#066x} = result:{3}'.format(
+            self.job_id, hash_int, self.target, result))
 
         return result
     def __repr__(self):

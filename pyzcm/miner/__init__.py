@@ -105,7 +105,7 @@ class GenericMiner(object):
         for i in range(sol_cnt):
             # len_and_solution = job.get_len_and_solution(solver.get_solution(i)
             len_and_solution = b'\xfd\x40\x05' + solver.get_solution(i)
-            if self.job.is_valid(header, len_and_solution, self.job.target):
+            if self.job.is_valid(header, len_and_solution):
                 self.log.info('FOUND VALID SOLUTION!')
                 self.submit_solution(nonce2, len_and_solution)
         t3 = time.time()

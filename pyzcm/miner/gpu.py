@@ -170,7 +170,14 @@ class GpuMiner(AsyncMiner):
         self._enqueue_last_mining_job()
 
     def __format__(self, format_spec):
-        return 'Async-frontend-GPU[{0}:{1}]'.format(self.gpu_id[0], self.gpu_id[1])
+        gpu_str = 'GPU[{0}:{1}-{2}]'.format(self.gpu_id[0], self.gpu_id[1], int.from_bytes(self.solver_nonce, 'little'))
+        # short version omits the prefix
+        if format_spec.endswith('s'):
+            prefix = ''
+        else:
+            prefix = 'Async-frontend-'
+
+        return prefix + gpu_str
 
     @asyncio.coroutine
     def run(self):

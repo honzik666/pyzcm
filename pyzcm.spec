@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Spec file for pyinstaller
 
-(c) 2016 Jan Čapek (honzik666)
+(c) 2016 Jan Capek (honzik666)
 
 MIT license
 """

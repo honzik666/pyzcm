@@ -20,7 +20,39 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import traceback
 import time
 
-from pyzcm.miner import GenericMiner, AsyncMiner
+from pyzcm.miner import GenericMiner, AsyncMiner, MinerStats
+from pyzcm.miner import STATS_REFRESH_PERIOD
+
+class _GpuMinerStats(MinerStats):
+    """GPU Miner statistics is also a kind of result received from the
+    mining process. Therefore, the class complies with the result interface.
+    """
+    def submit(self, subscriber):
+        subscriber.submit_stats(self)
+
+
+class _GpuMinerSolutionPack(object):
+    """Solution pack that is to be submitted to the asynchronous part of
+    the miner.
+
+    The solution pack consists of job, nonce2 and length
+    bytes + solution
+    """
+    def __init__(self, job, nonce2, len_and_solution):
+        self.job = job
+        self.nonce2 = nonce2
+        self.len_and_solution = len_and_solution
+
+    def submit(self, subscriber):
+        """
+        Submits solution to subscriber that fulfills the protocol below
+        """
+        subscriber.submit_solution(self.job, self.nonce2, self.len_and_solution)
+
+    def __format__(self, format_spec):
+        return 'Job ID: {0}, nonce2: {1}....'.format(self.job.job_id,
+                                                     binascii.hexlify(self.nonce2))
+
 
 class _GpuMinerProcess(GenericMiner):
     """This class represents a backend GPU miner that is run in a
@@ -38,24 +70,17 @@ class _GpuMinerProcess(GenericMiner):
         # is launched (see run())
         self.result_queue = None
         super(_GpuMinerProcess, self).__init__(solver_nonce)
+        # overwrite the status with GPU specific stats
+        self.stats = _GpuMinerStats()
+        self.last_stats_processing = time.time()
 
     def __format__(self, format_spec):
         return 'GPU[{0}:{1}](pid={2})'.format(self.gpu_id[0], self.gpu_id[1],
                                               os.getpid())
 
-    def count_solutions(self, count):
-        """Provide counter method required by the parent class
-        """
-        self.solution_count += count
-
     def submit_solution(self, job, nonce2, len_and_solution):
-        # part of the submission is the current value of the solution
-        # counter, we will reset it after submission so that any
-        # further submission in the set of found solutions won't
-        # influence the statics.
         assert(self.result_queue is not None)
-        self.result_queue.put((job, nonce2, len_and_solution, self.solution_count))
-        self.solution_count = 0
+        self.result_queue.put(_GpuMinerSolutionPack(job, nonce2, len_and_solution))
 
     def run(self, result_queue, work_queue):
         self.log.debug('Instantiating GPU solver process {0}, verbose={1}'.format(
@@ -83,7 +108,17 @@ class _GpuMinerProcess(GenericMiner):
                 else:
                     self.log.debug('No new job, running POW on old job')
             self.do_pow(solver, job)
+            self.process_new_stats(result_queue)
 
+    def process_new_stats(self, result_queue):
+        """
+        Processes new statistics by submitting them via the result queue if the refresh period has elapsed already
+        """
+        now = time.time()
+        if (time.time() - self.last_stats_processing) > STATS_REFRESH_PERIOD:
+            result_queue.put(self.stats)
+            self.stats = _GpuMinerStats()
+            self.last_stats_processing = now
 
 def run_miner_process(solver_nonce, gpu_id, solver_class, result_queue, work_queue):
     try:
@@ -99,9 +134,8 @@ class GpuMiner(AsyncMiner):
     asyncio framework and controls and instance of GpuMinerProcess()
     The miner communicates with the backend process via queues.
     """
-    def __init__(self, solver_nonce, loop, counter, gpu_id, solver_class):
+    def __init__(self, solver_nonce, loop, gpu_id, solver_class):
         """
-        @param counter - callback that accounts for found solution
         @param gpu_id - a tuple, that contains: platform_id and device_id
         """
         self.solver_class = solver_class
@@ -110,7 +144,7 @@ class GpuMiner(AsyncMiner):
         self.result_queue = mgr.Queue()
 #        self.miner_process = GpuMinerProcess(gpu_id, self.solver_class)
         self.gpu_id = gpu_id
-        super(GpuMiner, self).__init__(solver_nonce, loop, counter)
+        super(GpuMiner, self).__init__(solver_nonce, loop)
 
     def set_nonce1(self, nonce1):
         """Override the default implementation and enqueue the last mining job
@@ -151,9 +185,8 @@ class GpuMiner(AsyncMiner):
 
         executor = ThreadPoolExecutor(max_workers=1)
         while not self._stop:
-            (job, nonce2, len_and_solution,
-             counted) = yield from self.loop.run_in_executor(executor,
-                                                             self.result_queue.get)
-            self.log.debug('Received solution from backend')
-            self.count_solutions(counted)
-            self.submit_solution(job, nonce2, len_and_solution)
+            result = yield from self.loop.run_in_executor(executor,
+                                                          self.result_queue.get)
+            self.log.debug('Received result: {0} from GPU process, submitting'.
+                           format(result))
+            result.submit(self)

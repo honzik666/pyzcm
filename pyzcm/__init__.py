@@ -11,10 +11,13 @@ import logging
 import time
 import itertools
 import traceback
+import sys
+import io
 
 from pyzcm.miner.gpu import GpuMiner
 from pyzcm.miner.cpu import CpuMiner
 from pyzcm.stratum import StratumClient, Job
+from pyzcm.miner import MinerStats, STATS_REFRESH_PERIOD
 
 class Server(object):
     log = logging.getLogger('{0}.{1}'.format(__name__, 'Server'))
@@ -34,22 +37,33 @@ class Server(object):
     def __repr__(self):
         return str(self.__dict__)
 
+    def __format__(self, format_spec):
+        return '{0}:{1}@{2}:{3} tag={4}'.format(self.username, self.password,
+                                                self.host, self.port, self.tag)
+
 
 class ServerSwitcher(object):
     log = logging.getLogger('{0}.{1}'.format(__name__, 'ServerSwitcher'))
 
-    def __init__(self, loop, servers, miners):
+    def __init__(self, loop, servers, miners, stats_manager):
         self.loop = loop
         self.servers = servers
         self.miners = miners
+        self.stats_manager = stats_manager
+        self.stats_manager.miner_manager = self.miners
 
     @asyncio.coroutine
     def run(self):
         self.log.debug('Starting miners...')
+
+        self.loop.call_soon(self.stats_manager.run, self.loop)
+
         yield from self.miners.start(self.loop)
+
         for server in itertools.cycle(self.servers):
             try:
                 client = StratumClient(self.loop, server, self.miners)
+                self.stats_manager.stratum_client = client
                 yield from client.connect()
             except KeyboardInterrupt:
                 print('Closing...')
@@ -78,7 +92,7 @@ class MinerManager(object):
         if info is not None:
             for id in info.get_device_ids():
                 solver_nonce = len(self.miners).to_bytes(1, 'little')
-                m = miner_class(solver_nonce, loop, self.inc_solutions, id, 
+                m = miner_class(solver_nonce, loop, id,
                                 info.get_solver_class())
                 self.log.debug('Loaded miner: {}'.format(m))
                 self.miners.append(m)
@@ -94,11 +108,37 @@ class MinerManager(object):
         for m in self.miners:
             asyncio.async(m.run(), loop=loop)
 
-    def inc_solutions(self, i):
-        self.solutions += i
-        hash_rate_str = '{:.02f} H/s'.format(self.solutions / (time.time() - self.time_start))
-        print(hash_rate_str, flush=True)
-        self.log.info(hash_rate_str)
+    def format_stats(self):
+        """Collect statistics from all miners and generate a formatted report string.
+        """
+        stats = io.StringIO()
+        total_hash_rate = 0
+        total_accepted_share_count = 0
+        total_rejected_share_count = 0
+        total_rejected_share_perc_str = '--'
+
+        for m in self.miners:
+            total_hash_rate += m.stats.hash_rate
+            total_accepted_share_count += m.stats.accepted_share_count
+            total_rejected_share_count += m.stats.rejected_share_count
+            stats.write('{0:s}:{1:.02f} H/s:ACC[{2}]:REJ[{3}] | '.format(
+                m, m.stats.hash_rate, m.stats.accepted_share_count,
+                m.stats.rejected_share_count))
+
+        if total_accepted_share_count != 0:
+            total_rejected_share_perc_str = '{:.02f}%'.format(
+                total_rejected_share_count /
+                float(total_accepted_share_count))
+
+        stats.write('\nTotal hashrate: {0:.02f} H/s, Accepted shares:{1} '\
+                    'Rejected shares:{2} ({3} %)'.format(
+                        total_hash_rate,
+                        total_accepted_share_count,
+                        total_rejected_share_count,
+                        total_rejected_share_perc_str))
+        stats_str = stats.getvalue()
+        stats.close()
+        return stats_str
 
     def set_nonce(self, nonce1):
         for i, m in enumerate(self.miners):

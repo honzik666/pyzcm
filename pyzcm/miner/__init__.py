@@ -15,7 +15,10 @@ import time
 import asyncio
 
 from pyzcm.miner.params import *
+from pyzcm.stats import MinerStats
 
+# Miner statistics are refreshed/submitted every 2 seconds
+STATS_REFRESH_PERIOD = 2
 
 class GenericMiner(object):
     def __init__(self, solver_nonce):
@@ -27,6 +30,7 @@ class GenericMiner(object):
         # nonce so that it can be easily incremented
         self.nonce2_int = 0
         self._log = None
+        self.stats = MinerStats()
 
     @property
     def log(self):
@@ -62,17 +66,22 @@ class GenericMiner(object):
 
         return nonce2_bytes
 
+    def submit_stats(self, stats):
+        """Updates the current miner stats.
+        """
+        self.stats += stats
+
+    def update_accepted_stats(self, delta_time):
+        self.stats.update_accepted_shares(delta_time, 1)
+
+    def update_rejected_stats(self, delta_time):
+        self.stats.update_rejected_shares(delta_time, 1)
+
     @abc.abstractmethod
     def submit_solution(self, job, nonce2, len_and_solution):
         """Submit the solution prefixed with length and resulting nonce 2 of
         the solution
 
-        """
-        return
-
-    @abc.abstractmethod
-    def count_solutions(self, solution_count):
-        """Account for all found solutions
         """
         return
 
@@ -90,7 +99,8 @@ class GenericMiner(object):
         t1 = time.time()
         sol_cnt = solver.find_solutions(header)
         t2 = time.time()
-        self.count_solutions(sol_cnt)
+        new_stats = MinerStats(sol_cnt, t2 - t1)
+        self.submit_stats(new_stats)
         self.log.debug('Validating {0} solutions against target:{1:#066x}'.format(
             sol_cnt, job.target))
         for i in range(sol_cnt):
@@ -107,18 +117,16 @@ class GenericMiner(object):
 
 class AsyncMiner(GenericMiner):
 
-    def __init__(self, solver_nonce, loop, counter):
+    def __init__(self, solver_nonce, loop):
         """Asyncio miner initializer.
 
         @param loop - asyncio loop
 
-        @param counter object - called back with updates of all found
-        solutions in order to account for hashrate
+        @param receive_status - call back with updates of all collected mining statistics.
         """
         super(AsyncMiner, self).__init__(solver_nonce)
         self._stop = False
         self.loop = loop
-        self.counter = counter
         self.on_share = None
         self.last_received_job = None
 
@@ -131,13 +139,13 @@ class AsyncMiner(GenericMiner):
         self.on_share = on_share
 
     def submit_solution(self, job, nonce2, len_and_solution):
+        """Prepends solver nonce to the found nonce 2 and submits everything
+        along with a job and solution/length.
+        """
         assert(self.on_share != None)
         self.log.debug('Invoking on_share callback for JOB:0x{0}, nonce2:0x{1}'.format(
             job.job_id, binascii.hexlify(nonce2)))
-        self.on_share(job, self.solver_nonce + nonce2, len_and_solution)
-
-    def count_solutions(self, solution_count):
-        self.counter(solution_count)
+        self.on_share(self, job, self.solver_nonce + nonce2, len_and_solution)
 
     def stop(self):
         raise Exception('FIXME')

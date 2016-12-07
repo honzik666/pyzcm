@@ -145,15 +145,15 @@ class StratumClient(object):
         self.miners.set_nonce(nonce1)
         return nonce1
 
-    def submit(self, job, nonce2, len_and_solution):
+    def submit(self, miner, job, nonce2, len_and_solution):
         """Triggers asynchronous submission of the share to the stratum server
 
         """
-        asyncio.async(self._do_submit(job, nonce2, len_and_solution),
+        asyncio.async(self._do_submit(miner, job, nonce2, len_and_solution),
                       loop=self.loop)
 
     @asyncio.coroutine
-    def _do_submit(self, job, nonce2, len_and_solution):
+    def _do_submit(self, miner, job, nonce2, len_and_solution):
         """Submit a solution (share) to the stratum server.
 
         @param job - job that the miner has worked on and found solution
@@ -168,10 +168,13 @@ class StratumClient(object):
                         binascii.hexlify(job.ntime).decode('utf-8'),
                         binascii.hexlify(nonce2).decode('utf-8'),
                         binascii.hexlify(len_and_solution).decode('utf-8'))
-        delta_time_str = '{:.02f} s'.format(time.time() - t)
+        delta_time = time.time() - t
+        delta_time_str = '{:.02f} s'.format(delta_time)
         if ret['result'] == True:
+            miner.update_accepted_stats(delta_time)
             self.log.info('Share ACCEPTED in ' + delta_time_str)
         else:
+            miner.update_rejected_stats(delta_time)
             self.log.warn('Share REJECTED in ' + delta_time_str)
 
     @asyncio.coroutine

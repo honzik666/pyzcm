@@ -15,8 +15,8 @@ from pyzcm.miner import AsyncMiner
 
 class CpuMiner(AsyncMiner):
     """A CPU miner class - runs in a separate thread. """
-    def __init__(self, solver_nonce, loop, counter, cpu_id, solver_class):
-        super(CpuMiner, self).__init__(solver_nonce, loop, counter)
+    def __init__(self, solver_nonce, loop, cpu_id, solver_class):
+        super(CpuMiner, self).__init__(solver_nonce, loop)
         self.cpu_id = cpu_id
         self.solver = solver_class(verbose=self.is_logger_verbose())
 

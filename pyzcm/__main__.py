@@ -10,6 +10,7 @@ import logging
 import asyncio
 
 from pyzcm import Server, MinerManager, ServerSwitcher
+from pyzcm.stats import StatsManager
 from pyzcm.version import VERSION
 from pyzcm.info import CpuMinerInfo, GpuMinerInfo
 
@@ -128,7 +129,8 @@ def main():
 
     miner_manager = MinerManager(loop, get_cpu_miner_info(args),
                                  get_gpu_miner_info(args))
-    switcher = ServerSwitcher(loop, servers, miner_manager)
+    stats_manager = StatsManager()
+    switcher = ServerSwitcher(loop, servers, miner_manager, stats_manager)
     loop.run_until_complete(switcher.run())
 
     loop.close()

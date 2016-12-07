@@ -51,8 +51,7 @@ def Entrypoint(dist, group, name,
                     runtime_hooks=runtime_hooks)
 
 a = Entrypoint('pyzcm==1.0.0', 'console_scripts', 'pyzcm', hookspath=['.'])
-pyz = PYZ(a.pure, a.zipped_data,
-          cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 # Enable this options if verbose python run is required of the binary
 options = [
     #('v', None, 'OPTION'),

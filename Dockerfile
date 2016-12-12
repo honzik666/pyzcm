@@ -3,6 +3,9 @@ FROM slushpool/zceq-solver-buildenv
 MAINTAINER Jan Čapek <jan.capek@braiins.cz>
 
 WORKDIR /build
+
+RUN update-alternatives --install /usr/bin/x86_64-linux-gnu-g++ x86_64-linux-gnu-g++ /usr/bin/x86_64-linux-gnu-g++-6 999
+
 RUN apt-get update
 RUN apt-get install -y \
 	git \
@@ -17,7 +20,6 @@ RUN virtualenv --python=/usr/bin/python3 .venv
 RUN . .venv/bin/activate; \
     pip install numpy pyinstaller
 
-RUN update-alternatives --install /usr/bin/x86_64-linux-gnu-g++ x86_64-linux-gnu-g++ /usr/bin/x86_64-linux-gnu-g++-6 999
 
 # Install the pysa package without dependencies, since we need to pass the
 # install-option only to the package. An alternative would be to

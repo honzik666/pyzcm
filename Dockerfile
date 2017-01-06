@@ -13,7 +13,7 @@ RUN apt-get install -y \
 	libffi-dev \
 	libpython3.5-dev \
 	virtualenv
-ADD amd-app-sdk.tar.bz2 /opt
+ADD amd-app-sdk-installer.tar.bz2 /opt
 RUN /opt/AMD-APP-SDK-*.sh -- --acceptEULA 'yes' -s
 RUN virtualenv --python=/usr/bin/python3 .venv
 

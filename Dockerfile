@@ -27,7 +27,7 @@ RUN . .venv/bin/activate; \
 RUN . /etc/profile.d/AMDAPPSDK.sh; . .venv/bin/activate; \
     cl_include=$AMDAPPSDKROOT/include; \
     cl_lib=$AMDAPPSDKROOT/lib/x86_64; \
-    pip install -v --no-deps  --install-option=build \
+    pip install -v --no-deps  --install-option=install \
     --install-option="--scons-opts=--opencl-headers=$cl_include,--opencl-library=$cl_lib" \
     git+https://github.com/honzik666/silentarmy@library-2#egg=pysa && \
     pip install pysa && \
